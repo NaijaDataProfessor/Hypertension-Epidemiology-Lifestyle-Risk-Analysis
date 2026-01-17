@@ -1,0 +1,177 @@
+--- Hypertension Drivers Analysis Using Patient Health Records
+/*
+------------------------------------------------------------------------------
+-----------------------------------------------------------------------------
+Key Analytical Questions
+-----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
+1.
+What percentage of patients are hypertensive?
+2.
+Which demographic groups are most affected?
+3.
+Does family history significantly correlate with hypertension?
+4.
+What lifestyle factors are common among hypertensive patients?
+5.
+Are smoking and obesity dominant contributors?
+6.
+Is sleep deprivation associated with high BP?
+7.
+Do stress levels differ significantly between groups?
+8.
+How does physical inactivity influence hypertension prevalence?
+9.
+What proportion of hypertensive patients are receiving treatment?
+10.
+Which combined risk factors define the highest-risk clusters?
+*/
+
+--- Crearting Hypertension project database 
+CREATE DATABASE hypertension_project;
+
+--- Selecting the database to be used 
+USE hypertension_project;
+
+--- Disaplay the tables in the database 
+SHOW TABLES;
+
+--- Age,Salt_Intake,Stress_Score,BP_History,Sleep_Duration,BMI,Medication,Family_History,Exercise_Level,Smoking_Status,Has_Hypertension
+
+--- Creating Hypertention table 
+CREATE TABLE bp_data 
+(
+Age VARCHAR(300),
+Salt_Intake VARCHAR(300),
+Stress_Score VARCHAR(300),
+BP_History VARCHAR(300),
+Sleep_Duration VARCHAR(300),
+BMI VARCHAR(300),
+Medication VARCHAR(300),
+Family_History VARCHAR(300),
+Exercise_Level VARCHAR(300),
+Smoking_Status VARCHAR(300),
+Has_Hypertension VARCHAR(300)
+);
+
+--- file path == "C:/ProgramData/MySQL/MySQL Server 9.3/Uploads/hypertension_dataset.csv"
+
+--- Load data into the bp_data table 
+LOAD DATA INFILE "C:/ProgramData/MySQL/MySQL Server 9.3/Uploads/hypertension_dataset.csv"
+INTO TABLE bp_data
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS;
+
+--- Query dataset 
+SELECT *
+FROM bp_data
+LIMIT 10;
+
+--- Creating staged dataset
+CREATE TEMPORARY TABLE dataset AS 
+(
+SELECT *
+FROM bp_data
+);
+
+--- Querying the staged dataset
+SELECT *
+FROM dataset 
+LIMIT 10;
+
+--- Checking for duplicated rows 
+SELECT COUNT(*) AS row_count
+FROM dataset;
+
+--- Counting non duplicated rows 
+SELECT COUNT(*) AS row_count
+FROM (
+		SELECT DISTINCT *
+        FROM dataset
+	) AS distinct_data;
+    
+--- Modify has_hypertension to bp_status
+ALTER TABLE dataset
+RENAME COLUMN has_hypertension TO bp_status;
+
+--- What percentage of patients are hypertensive?
+SELECT 
+	COUNT(*) AS total_patients,
+    ROUND(
+		SUM(
+			CASE 
+				WHEN bp_status = 'Yes' THEN 1 ELSE 0 END),2) AS bp_patients,
+	ROUND(
+		100.00 * SUM(
+			CASE 
+				WHEN bp_status = 'Yes' THEN 1 ELSE 0 END) / COUNT(*),2) AS bp_rate
+FROM dataset;
+
+
+--- Which demographic groups are most affected?
+SELECT 
+	CASE
+		WHEN age BETWEEN 18 AND 24 THEN 'Youth'
+        WHEN age BETWEEN 25 AND 36 THEN 'Young Adult'
+        WHEN age BETWEEN 37 and 59 THEN 'Adult'
+        ELSE 'Senior'
+	END AS age_group,
+    COUNT(*) AS total_affected_patients
+FROM dataset
+WHERE bp_status = 'Yes'
+GROUP BY age_group
+ORDER BY total_affected_patients DESC;
+
+--- OR 
+SELECT 
+	CASE
+		WHEN age BETWEEN 18 AND 24 THEN 'Youth'
+        WHEN age BETWEEN 25 AND 36 THEN 'Young Adult'
+        WHEN age BETWEEN 37 and 59 THEN 'Adult'
+        ELSE 'Senior'
+	END AS age_group,
+    SUM(
+		CASE 
+			WHEN bp_status = 'Yes' THEN 1 ELSE 0 END) AS affected_patients         
+FROM dataset
+GROUP BY age_group
+ORDER BY affected_patients DESC;
+
+--- Does family history significantly correlate with hypertension?
+SELECT 
+	family_history,
+    SUM(
+		CASE
+			WHEN bp_status = 'Yes' THEN 1 ELSE 0 END) AS hypertensive_patients
+FROM dataset
+GROUP BY family_history;
+
+--- What lifestyle factors are common among hypertensive patients?
+WITH hypternsive_patients AS 
+(
+SELECT *
+FROM dataset
+WHERE bp_status = 'Yes'
+)
+SELECT
+	smoking_status,
+	exercise_level,
+	CAST(AVG(bmi) AS DECIMAL(4,2)) AS average_bmi,
+	CAST(AVG(sleep_duration) AS DECIMAL(3,2)) AS average_sleep_duration,
+    CAST(AVG(salt_intake) AS DECIMAL(3,2)) AS average_salt_intake,
+    CAST(AVG(stress_score) AS DECIMAL(3,2)) AS stress_level
+FROM hypternsive_patients
+GROUP BY smoking_status, exercise_level;
+    
+    
+--- What proportion of hypertensive patients are receiving treatment?
+SELECT medication, COUNT(medication) AS medication_count
+FROM dataset
+WHERE bp_status = 'Yes' AND medication <> 'None'
+GROUP BY medication;
+		
+        
+
+
+
